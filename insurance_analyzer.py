@@ -10,7 +10,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 import json
 from dataclasses import dataclass
-from typing import List, Dict, Union, Optional
+from typing import List, Optional
 from pathlib import Path
 import docx
 from PyPDF2 import PdfReader
@@ -122,7 +122,7 @@ class CoverageAnalyzer:
     
     def _parse_amount(self, amount_text: str) -> tuple[Optional[float], str]:
         """
-        Parse amount from text, handling various formats
+        Parse amount from text, handling various formats including hybrid number-word combinations
         Returns tuple of (numeric_amount, original_text)
         """
         # Remove any whitespace and convert to lowercase for consistent processing
@@ -138,6 +138,17 @@ class CoverageAnalyzer:
             try:
                 # Remove commas and convert to float
                 numeric_value = float(match.group(1).replace(",", ""))
+                # Check for multiplier words after the number
+                multipliers = {
+                    "thousand": 1000,
+                    "million": 1000000,
+                    "billion": 1000000000
+                }
+                remaining_text = cleaned_text[match.end():].strip()
+                for word, multiplier in multipliers.items():
+                    if remaining_text.startswith(word):
+                        numeric_value *= multiplier
+                        break
                 return numeric_value, original_text
             except ValueError:
                 pass
@@ -150,8 +161,11 @@ class CoverageAnalyzer:
             # Use word2number to parse written numbers
             numeric_value = w2n.word_to_num(number_text)
             return float(numeric_value), original_text
-        except Exception:
-            pass
+        except ValueError as e:
+            self.logger.warning(f"Failed to parse written number '{number_text}': {e}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error parsing '{number_text}': {e}", exc_info=True)
+
         
         # Return None for numeric value if we could not parse it
         return None, original_text
@@ -197,7 +211,7 @@ class CoverageAnalyzer:
         
         for coverage_type in coverage_types:
             # Look for coverage type and associated amount
-            coverage_pattern = fr"{coverage_type}.*?(?:Coverage|Amount|Limit):\s*(.*?)(?:\n|$)"
+            coverage_pattern = fr"{coverage_type}.*?(?:Coverage|Amount|Limit|Benefit|Maximum|Protection|Sum Insured|Up to|Pays|Entitled to):?\s*(.*?)(?:\n|$)"
             coverage_matches = re.finditer(coverage_pattern, text, re.IGNORECASE | re.DOTALL)
             
             for match in coverage_matches:
@@ -245,7 +259,7 @@ class ReportGenerator:
         for coverage in coverages:
             amount_display = (
                 f"${coverage.amount:,.2f}" if coverage.amount is not None
-                else coverage.amount_text
+                else 0.0 
             )
             self.logger.debug(f"Formatting coverage amount: {amount_display}")
             
