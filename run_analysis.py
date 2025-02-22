@@ -3,7 +3,7 @@ from insurance_analyzer import InsuranceDocumentAnalyzer, DocumentError
 
 def main():
     analyzer = InsuranceDocumentAnalyzer()
-    file_path = Path("/Users/admin/Downloads/InsuranceExample1.pdf")
+    file_path = Path("ExamplePolicy2.pdf")
     
     try:
         extracted_text = analyzer.process_document(file_path)
