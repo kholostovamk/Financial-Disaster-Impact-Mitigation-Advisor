@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import json
 from dataclasses import dataclass
 from typing import List, Dict, Union, Optional
 from pathlib import Path
@@ -193,35 +194,30 @@ class ReportGenerator:
     """Generates summary report of insurance coverage"""
     
     def generate_report(self, customer: CustomerInfo, coverages: List[Coverage]) -> str:
-        """Generate a formatted report with customer and coverage information"""
-        report_lines = [
-            "Insurance Coverage Summary Report",
-            "",
-            "Customer Information:",
-            "-------------------",
-            f"Name: {customer.name}",
-            f"Policy Number: {customer.policy_number}",
-            f"Effective Date: {customer.effective_date}",
-            "",
-            "Coverage Details:",
-            "---------------"
-        ]
+        """Generate a JSON report with customer and coverage information"""
+        report_data = {
+            "customer_information": {
+                "name": customer.name,
+                "policy_number": customer.policy_number,
+                "effective_date": customer.effective_date
+            },
+            "coverage_details": []
+        }
         
         for coverage in coverages:
             amount_display = (
                 f"${coverage.amount:,.2f}" if coverage.amount is not None
-                else f"Amount specified as: {coverage.amount_text}"
+                else coverage.amount_text
             )
             
-            coverage_lines = [
-                "",
-                f"Type: {coverage.type}",
-                f"Amount: {amount_display}",
-                f"Details: {coverage.details}"
-            ]
-            report_lines.extend(coverage_lines)
+            coverage_data = {
+                "type": coverage.type,
+                "amount": amount_display,
+                "details": coverage.details
+            }
+            report_data["coverage_details"].append(coverage_data)
         
-        return "\n".join(report_lines)
+        return json.dumps(report_data, indent=2)
 
 class InsuranceDocumentAnalyzer:
     """Main class for analyzing insurance documents"""
