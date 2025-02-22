@@ -1,6 +1,13 @@
 import logging
+import re
 from abc import ABC, abstractmethod
 from word2number import w2n
+import json
+from dataclasses import dataclass
+from typing import List, Optional
+from pathlib import Path
+import docx
+from PyPDF2 import PdfReader
 
 # Configure logging
 logging.basicConfig(
@@ -8,65 +15,53 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-import json
-from dataclasses import dataclass
-from typing import List, Optional
-from pathlib import Path
-import docx
-from PyPDF2 import PdfReader
-import re
 
 @dataclass
 class Coverage:
-    """Data class to store coverage information"""
-    type: str  # Type of coverage (e.g., "Life", "Health", "Property")
-    amount: Optional[float]  # Coverage amount, None if not specified numerically
-    amount_text: str  # Original amount text as found in document
-    details: str  # Additional coverage details
+    """Data class to store coverage information."""
+    type: str                   # E.g., "Life Insurance", "Health Insurance"
+    amount: Optional[float]     # Parsed numerical amount; None if parsing fails
+    amount_text: str            # Original text that contains the amount
+    details: str                # Additional details (if any)
 
 @dataclass
 class CustomerInfo:
-    """Data class to store customer information"""
+    """Data class to store customer information."""
     name: str
     policy_number: str
     effective_date: str
 
 class DocumentError(Exception):
-    """Custom exception for document processing errors"""
+    """Custom exception for document processing errors."""
     pass
 
 class DocumentProcessor(ABC):
-    """Abstract base class for document processing"""
+    """Abstract base class for document processing."""
     
     def __init__(self):
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
     
     @abstractmethod
     def extract_text(self, file_path: Path) -> str:
-        """Extract text from document"""
+        """Extract text from document."""
         pass
 
     def validate_file(self, file_path: Path) -> None:
         """Validate that the file exists, is a file, and is not empty."""
-        
         self.logger.debug(f"Validating file: {file_path}")
-
         if not file_path.exists() or not file_path.is_file():
             self.logger.error(f"Invalid file path: {file_path}")
             raise DocumentError(f"Invalid file path: {file_path}")
-
         if file_path.stat().st_size == 0:
             self.logger.error(f"File is empty: {file_path}")
             raise DocumentError(f"File is empty: {file_path}")
-
         self.logger.debug(f"File validation passed: {file_path}")
 
-
 class PDFProcessor(DocumentProcessor):
-    """PDF document processor"""
+    """PDF document processor."""
     
     def extract_text(self, file_path: Path) -> str:
-        """Extract text from PDF document"""
+        """Extract text from PDF document."""
         self.logger.info(f"Extracting text from PDF: {file_path}")
         self.validate_file(file_path)
         try:
@@ -91,12 +86,11 @@ class PDFProcessor(DocumentProcessor):
             self.logger.error(f"Error extracting text from PDF: {e}", exc_info=True)
             raise DocumentError(f"Failed to extract text from PDF: {e}")
 
-
 class DOCXProcessor(DocumentProcessor):
-    """DOCX document processor"""
+    """DOCX document processor."""
     
     def extract_text(self, file_path: Path) -> str:
-        """Extract text from DOCX document"""
+        """Extract text from DOCX document."""
         self.logger.info(f"Extracting text from DOCX: {file_path}")
         self.validate_file(file_path)
         try:
@@ -112,38 +106,31 @@ class DOCXProcessor(DocumentProcessor):
                 raise DocumentError("No text content found in DOCX")
             return text
         except Exception as e:
-            raise DocumentError(f"Error processing DOCX: {str(e)}")
+            self.logger.error(f"Error processing DOCX: {e}", exc_info=True)
+            raise DocumentError(f"Error processing DOCX: {e}")
 
 class CoverageAnalyzer:
-    """Analyzes document text to extract coverage information"""
+    """Analyzes document text to extract coverage information."""
     
     def __init__(self):
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
     
     def _parse_amount(self, amount_text: str) -> tuple[Optional[float], str]:
         """
-        Parse amount from text, handling various formats including hybrid number-word combinations
-        Returns tuple of (numeric_amount, original_text)
+        Parse an amount from text, handling both numeric and word-based formats.
+        Returns a tuple: (numeric_amount, original_amount_text).
         """
-        # Remove any whitespace and convert to lowercase for consistent processing
         cleaned_text = amount_text.strip().lower()
         original_text = amount_text.strip()
         
-        # Try to extract numeric value
-        # Handle formats like "$1,234.56", "1234.56", "1,234", etc.
+        # Try numeric extraction: e.g., "$1,234.56"
         numeric_pattern = r"\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)"
         match = re.search(numeric_pattern, cleaned_text)
-        
         if match:
             try:
-                # Remove commas and convert to float
                 numeric_value = float(match.group(1).replace(",", ""))
-                # Check for multiplier words after the number
-                multipliers = {
-                    "thousand": 1000,
-                    "million": 1000000,
-                    "billion": 1000000000
-                }
+                # Check for multipliers following the number (e.g., "thousand")
+                multipliers = {"thousand": 1000, "million": 1000000, "billion": 1000000000}
                 remaining_text = cleaned_text[match.end():].strip()
                 for word, multiplier in multipliers.items():
                     if remaining_text.startswith(word):
@@ -153,98 +140,151 @@ class CoverageAnalyzer:
             except ValueError:
                 pass
         
-        # Handle written amounts like "one million dollars" or "one hundred fifty thousand dollars"
-        # Remove common words that might interfere with number parsing
+        # Try word-to-number conversion for written amounts
         number_text = cleaned_text.replace("dollars", "").replace("$", "").strip()
-        
         try:
-            # Use word2number to parse written numbers
             numeric_value = w2n.word_to_num(number_text)
             return float(numeric_value), original_text
         except ValueError as e:
             self.logger.warning(f"Failed to parse written number '{number_text}': {e}")
         except Exception as e:
             self.logger.error(f"Unexpected error parsing '{number_text}': {e}", exc_info=True)
-
         
-        # Return None for numeric value if we could not parse it
         return None, original_text
     
+    def extract_coverage_details(self, text: str) -> List[Coverage]:
+        self.logger.debug("Starting coverage pattern analysis")
+        coverages = []
+        
+        # First, extract limits from the declarations section.
+        declaration_limits = extract_declaration_limits(text)
+        self.logger.debug(f"Extracted declaration limits: {declaration_limits}")
+        
+        # Revised pattern to capture headers like "COVERAGE C - Personal Property"
+        general_pattern = r"(?i)coverage\s*([A-Z])\s*[-–]\s*([\w\s']+)"
+        
+        for match in re.finditer(general_pattern, text):
+            coverage_letter = match.group(1).strip()
+            coverage_description = match.group(2).strip()
+            
+            # Create a key to look up the limit
+            key = f"Coverage {coverage_letter}"
+            numeric_value = declaration_limits.get(key)
+            amount_text = f"${numeric_value:,.2f}" if numeric_value is not None else ""
+            
+            # If no limit is found in the declarations mapping, fall back to searching in the nearby block.
+            if numeric_value is None:
+                start = match.end()
+                block = text[start:start+2000]
+                dollar_amounts = re.findall(r"\$([\d,]+(?:\.\d{2})?)", block)
+                if dollar_amounts:
+                    numeric_value = float(dollar_amounts[0].replace(",", ""))
+                    amount_text = "$" + dollar_amounts[0]
+            
+            coverages.append(Coverage(
+                type=f"Coverage {coverage_letter} - {coverage_description}",
+                amount=numeric_value,
+                amount_text=amount_text,
+                details="Extracted using header and declarations mapping" if numeric_value is not None else "Extracted from contract header block"
+            ))
+        
+        if not coverages:
+            self.logger.warning("No coverage information found in document")
+            raise DocumentError("No coverage information found in document")
+        
+        return coverages
+
+
+
     def analyze_text(self, text: str) -> tuple[CustomerInfo, List[Coverage]]:
-        """
-        Analyze document text to extract customer information and coverage details.
-        Uses regex patterns to identify relevant information.
-        """
         self.logger.info("Starting document text analysis")
         self.logger.debug(f"Analyzing text of length: {len(text)}")
         if not text.strip():
             raise DocumentError("Document contains no text to analyze")
         
-        # Extract customer information
-        name_pattern = r"Policy\s+Holder:\s*([^\n]+)"
-        policy_pattern = r"Policy\s+Number:\s*([^\n]+)"
-        date_pattern = r"Effective\s+Date:\s*([^\n]+)"
-        
-        name = re.search(name_pattern, text)
-        policy_number = re.search(policy_pattern, text)
-        effective_date = re.search(date_pattern, text)
-        
-        customer = CustomerInfo(
-            name=name.group(1) if name else "Unknown",
-            policy_number=policy_number.group(1) if policy_number else "Unknown",
-            effective_date=effective_date.group(1) if effective_date else "Unknown"
-        )
-        
-        # Extract coverage information
-        self.logger.debug("Starting coverage pattern analysis")
-        coverages = []
-        
-        # Common coverage types to look for
-        coverage_types = [
-            "Life Insurance",
-            "Health Insurance",
-            "Property Insurance",
-            "Auto Insurance",
-            "Liability Coverage",
-            "Disability Insurance"
-        ]
-        
-        for coverage_type in coverage_types:
-            # Look for coverage type and associated amount
-            coverage_pattern = fr"{coverage_type}.*?(?:Coverage|Amount|Limit|Benefit|Maximum|Protection|Sum Insured|Up to|Pays|Entitled to):?\s*(.*?)(?:\n|$)"
-            coverage_matches = re.finditer(coverage_pattern, text, re.IGNORECASE | re.DOTALL)
-            
-            for match in coverage_matches:
-                amount_text = match.group(1).strip()
-                numeric_amount, original_amount_text = self._parse_amount(amount_text)
-                
-                # Look for additional details in the vicinity
-                details_text = text[max(0, match.start() - 100):min(len(text), match.end() + 100)]
-                details_pattern = r"Details?:|Description:|(Terms? and Conditions?:).*?(?=\n\n|\Z)"
-                details_match = re.search(details_pattern, details_text, re.IGNORECASE | re.DOTALL)
-                
-                details = details_match.group(0) if details_match else "No additional details found"
-                
-                coverages.append(Coverage(
-                    type=coverage_type,
-                    amount=numeric_amount,
-                    amount_text=original_amount_text,
-                    details=details.strip()
-                ))
-        
-        if not coverages:
-            raise DocumentError("No coverage information found in document")
+        customer = self.extract_customer_info(text)
+        coverages = self.extract_coverage_details(text)
         
         return customer, coverages
 
+
+    def extract_customer_info(self, text: str) -> CustomerInfo:
+        """ Wrapper for the improved customer info extraction. """
+        return extract_customer_info(text)
+
+# Standalone function for customer info extraction (used in CoverageAnalyzer)
+def extract_customer_info(text: str) -> CustomerInfo:
+    """Extracts customer info using multiple patterns."""
+    name_patterns = [
+        r"(?i)Policy\s+Holder[:\s]+([A-Za-z\s]+)",
+        r"(?i)Insured[:\s]+([A-Za-z\s]+)",
+        r"(?i)Policyholder[:\s]+([A-Za-z\s]+)"
+    ]
+    policy_patterns = [
+        r"(?i)Policy\s*(?:Number|#)[:\s]+([\w\d-]+)"
+    ]
+    date_patterns = [
+        r"(?i)Effective\s*Date[:\s]+([\d]{4}-[\d]{2}-[\d]{2})",
+        r"(?i)Effective\s*Date[:\s]+([A-Za-z]+\s+\d{1,2},\s+\d{4})"
+    ]
+    customer_name = "Unknown"
+    policy_number = "Unknown"
+    effective_date = "Unknown"
+    for pat in name_patterns:
+        m = re.search(pat, text)
+        if m:
+            customer_name = m.group(1).strip()
+            break
+    for pat in policy_patterns:
+        m = re.search(pat, text)
+        if m:
+            policy_number = m.group(1).strip()
+            break
+    for pat in date_patterns:
+        m = re.search(pat, text)
+        if m:
+            effective_date = m.group(1).strip()
+            break
+    return CustomerInfo(name=customer_name, policy_number=policy_number, effective_date=effective_date)
+
+
+def extract_declaration_limits(text: str) -> dict:
+    """
+    Attempts to extract a mapping of coverage headers to monetary limits from the declarations section.
+    For example, for HO-4 policies, it might map:
+      "Coverage C" -> 1000, "Coverage D" -> 0 (if not found),
+      "Coverage E" -> 100000, "Coverage F" -> 0, "Coverage G" -> 1000.
+    This is a heuristic based on ordering within a specific block.
+    """
+    limits = {}
+    # Look for the declarations block that mentions "Limit of Insurance Personal Property Group"
+    declaration_pattern = r"(?i)Limit of\s+Insurance\s+Personal\s+Property\s+Group(.+?)(?=COVERAGE|$)"
+    match = re.search(declaration_pattern, text, re.DOTALL)
+    if match:
+        block = match.group(1)
+        # Find all dollar amounts in the block
+        amounts = re.findall(r"\$[\s]*([\d,]+(?:\.\d{2})?)", block)
+        # Define an ordered list of coverage keys based on typical HO-4 ordering
+        keys = ["Coverage C", "Coverage D", "Coverage E", "Coverage F", "Coverage G"]
+        for i, amt in enumerate(amounts):
+            if i < len(keys):
+                try:
+                    limits[keys[i]] = float(amt.replace(",", ""))
+                except ValueError:
+                    limits[keys[i]] = None
+    return limits
+
+
+
+
 class ReportGenerator:
-    """Generates summary report of insurance coverage"""
+    """Generates a JSON report of insurance coverage."""
     
     def __init__(self):
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
     
     def generate_report(self, customer: CustomerInfo, coverages: List[Coverage]) -> str:
-        """Generate a JSON report with customer and coverage information"""
+        """Generate a JSON report with customer and coverage information."""
         self.logger.info("Generating insurance coverage report")
         self.logger.debug(f"Customer: {customer.name}, Policy: {customer.policy_number}")
         report_data = {
@@ -258,22 +298,19 @@ class ReportGenerator:
         
         for coverage in coverages:
             amount_display = (
-                f"${coverage.amount:,.2f}" if coverage.amount is not None
-                else 0.0 
+                f"${coverage.amount:,.2f}" if coverage.amount is not None else "0.0"
             )
             self.logger.debug(f"Formatting coverage amount: {amount_display}")
-            
-            coverage_data = {
+            report_data["coverage_details"].append({
                 "type": coverage.type,
                 "amount": amount_display,
                 "details": coverage.details
-            }
-            report_data["coverage_details"].append(coverage_data)
+            })
         
         return json.dumps(report_data, indent=2)
 
 class InsuranceDocumentAnalyzer:
-    """Main class for analyzing insurance documents"""
+    """Main class for analyzing insurance documents."""
     
     def __init__(self):
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
@@ -284,21 +321,20 @@ class InsuranceDocumentAnalyzer:
     
     def process_document(self, file_path: Path) -> str:
         """
-        Process an insurance document and generate a coverage report
+        Process an insurance document and generate a coverage report.
         
         Args:
-            file_path: Path to the insurance document (PDF or DOCX)
-            
+            file_path: Path to the insurance document (PDF or DOCX).
+        
         Returns:
-            str: Generated report summarizing the coverage
-            
+            A JSON-formatted report summarizing the coverage.
+        
         Raises:
-            DocumentError: If there are any issues processing the document
+            DocumentError: If there are issues processing the document.
         """
-        # Select appropriate processor based on file extension
         if not isinstance(file_path, Path):
             file_path = Path(file_path)
-            
+        
         if file_path.suffix.lower() == ".pdf":
             processor = self.pdf_processor
         elif file_path.suffix.lower() in [".docx", ".doc"]:
@@ -306,11 +342,6 @@ class InsuranceDocumentAnalyzer:
         else:
             raise DocumentError(f"Unsupported file type: {file_path.suffix}")
         
-        # Extract text from document
         text = processor.extract_text(file_path)
-        
-        # Analyze text to extract customer info and coverages
-        customer_info, coverages = self.analyzer.analyze_text(text)
-        
-        # Generate and return report
-        return self.report_generator.generate_report(customer_info, coverages)
+        customer, coverages = self.analyzer.analyze_text(text)
+        return self.report_generator.generate_report(customer, coverages)
