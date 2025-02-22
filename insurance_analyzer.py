@@ -1,4 +1,13 @@
+import logging
 from abc import ABC, abstractmethod
+from word2number import w2n
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 import json
 from dataclasses import dataclass
 from typing import List, Dict, Union, Optional
@@ -29,26 +38,41 @@ class DocumentError(Exception):
 class DocumentProcessor(ABC):
     """Abstract base class for document processing"""
     
+    def __init__(self):
+        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+    
     @abstractmethod
     def extract_text(self, file_path: Path) -> str:
         """Extract text from document"""
         pass
 
     def validate_file(self, file_path: Path) -> None:
-        """Validate file before processing"""
-        if not file_path.exists():
-            raise DocumentError(f"File does not exist: {file_path}")
+        """Validate that the file exists, is a file, and is not empty."""
+        
+        self.logger.debug(f"Validating file: {file_path}")
+
+        if not file_path.exists() or not file_path.is_file():
+            self.logger.error(f"Invalid file path: {file_path}")
+            raise DocumentError(f"Invalid file path: {file_path}")
+
         if file_path.stat().st_size == 0:
+            self.logger.error(f"File is empty: {file_path}")
             raise DocumentError(f"File is empty: {file_path}")
+
+        self.logger.debug(f"File validation passed: {file_path}")
+
 
 class PDFProcessor(DocumentProcessor):
     """PDF document processor"""
     
     def extract_text(self, file_path: Path) -> str:
+        """Extract text from PDF document"""
+        self.logger.info(f"Extracting text from PDF: {file_path}")
         self.validate_file(file_path)
         try:
             reader = PdfReader(file_path)
             if len(reader.pages) == 0:
+                self.logger.error("PDF file contains no pages")
                 raise DocumentError("PDF file contains no pages")
             
             text = ""
@@ -58,17 +82,25 @@ class PDFProcessor(DocumentProcessor):
                     text += extracted + "\n"
             
             if not text.strip():
+                self.logger.error("No text content found in PDF")
                 raise DocumentError("No text content found in PDF")
+            
+            self.logger.debug(f"Successfully extracted text from {len(reader.pages)} pages")
             return text
         except Exception as e:
-            raise DocumentError(f"Error processing PDF: {str(e)}")
+            self.logger.error(f"Error extracting text from PDF: {e}", exc_info=True)
+            raise DocumentError(f"Failed to extract text from PDF: {e}")
+
 
 class DOCXProcessor(DocumentProcessor):
     """DOCX document processor"""
     
     def extract_text(self, file_path: Path) -> str:
+        """Extract text from DOCX document"""
+        self.logger.info(f"Extracting text from DOCX: {file_path}")
         self.validate_file(file_path)
         try:
+            self.logger.debug("Opening DOCX document")
             doc = docx.Document(file_path)
             text = ""
             for paragraph in doc.paragraphs:
@@ -76,6 +108,7 @@ class DOCXProcessor(DocumentProcessor):
                     text += paragraph.text + "\n"
             
             if not text.strip():
+                self.logger.error("No text content found in DOCX")
                 raise DocumentError("No text content found in DOCX")
             return text
         except Exception as e:
@@ -83,6 +116,9 @@ class DOCXProcessor(DocumentProcessor):
 
 class CoverageAnalyzer:
     """Analyzes document text to extract coverage information"""
+    
+    def __init__(self):
+        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
     
     def _parse_amount(self, amount_text: str) -> tuple[Optional[float], str]:
         """
@@ -106,20 +142,14 @@ class CoverageAnalyzer:
             except ValueError:
                 pass
         
-        # Handle written amounts like "one million dollars"
-        number_words = {
-            "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
-            "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
-            "hundred": 100, "thousand": 1000, "million": 1000000,
-            "billion": 1000000000
-        }
+        # Handle written amounts like "one million dollars" or "one hundred fifty thousand dollars"
+        # Remove common words that might interfere with number parsing
+        number_text = cleaned_text.replace("dollars", "").replace("$", "").strip()
         
         try:
-            for word, value in number_words.items():
-                if word in cleaned_text:
-                    # This is a simplified handling - for production use,
-                    # you would want more sophisticated number word parsing
-                    return value, original_text
+            # Use word2number to parse written numbers
+            numeric_value = w2n.word_to_num(number_text)
+            return float(numeric_value), original_text
         except Exception:
             pass
         
@@ -131,6 +161,8 @@ class CoverageAnalyzer:
         Analyze document text to extract customer information and coverage details.
         Uses regex patterns to identify relevant information.
         """
+        self.logger.info("Starting document text analysis")
+        self.logger.debug(f"Analyzing text of length: {len(text)}")
         if not text.strip():
             raise DocumentError("Document contains no text to analyze")
         
@@ -150,6 +182,7 @@ class CoverageAnalyzer:
         )
         
         # Extract coverage information
+        self.logger.debug("Starting coverage pattern analysis")
         coverages = []
         
         # Common coverage types to look for
@@ -193,8 +226,13 @@ class CoverageAnalyzer:
 class ReportGenerator:
     """Generates summary report of insurance coverage"""
     
+    def __init__(self):
+        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
+    
     def generate_report(self, customer: CustomerInfo, coverages: List[Coverage]) -> str:
         """Generate a JSON report with customer and coverage information"""
+        self.logger.info("Generating insurance coverage report")
+        self.logger.debug(f"Customer: {customer.name}, Policy: {customer.policy_number}")
         report_data = {
             "customer_information": {
                 "name": customer.name,
@@ -209,6 +247,7 @@ class ReportGenerator:
                 f"${coverage.amount:,.2f}" if coverage.amount is not None
                 else coverage.amount_text
             )
+            self.logger.debug(f"Formatting coverage amount: {amount_display}")
             
             coverage_data = {
                 "type": coverage.type,
@@ -223,6 +262,7 @@ class InsuranceDocumentAnalyzer:
     """Main class for analyzing insurance documents"""
     
     def __init__(self):
+        self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         self.pdf_processor = PDFProcessor()
         self.docx_processor = DOCXProcessor()
         self.analyzer = CoverageAnalyzer()
