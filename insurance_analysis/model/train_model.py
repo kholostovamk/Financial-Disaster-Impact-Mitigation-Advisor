@@ -19,15 +19,38 @@ def train_disaster_model(data_path):
     """
     df = pd.read_csv(data_path)
 
-    # One-hot encode the 'incidentType' column
     df = pd.get_dummies(df, columns=['incidentType'])
 
-    X = df[['combinedFIPS', 'Precipitation', 'MaxTemp', 'MinTemp', 'AverageTemp', 'Month', 'year', 'Latitude', 'Longitude']]
+    X = df[['combinedFIPS', 'Precipitation', 'AverageTemp', 'Month', 'year', 'Latitude', 'Longitude']]
     y = df.filter(like='incidentType_')  # Selecting all one-hot encoded incident types
+    y = y.drop(columns=['incidentType_Volcanic Eruption', 
+                    'incidentType_Terrorist', 
+                    'incidentType_Fishing Losses', "incidentType_Dam/Levee Break"], errors='ignore')
     
+    y['incidentType_Storm'] = (y['incidentType_Severe Storm'] + 
+                           y['incidentType_Winter Storm'] + 
+                           y['incidentType_Snowstorm'] + 
+                           y['incidentType_Tropical Storm'] + 
+                           y['incidentType_Severe Ice Storm'] + 
+                           y['incidentType_Coastal Storm'])
+    
+    y['incidentType_Tornado'] = (y['incidentType_Tornado'] + 
+                           y['incidentType_Hurricane'] + 
+                           y['incidentType_Typhoon'])
+
+
+    # Drop the original individual storm-related columns
+    y = y.drop(columns=['incidentType_Severe Storm', 
+                        'incidentType_Winter Storm', 
+                        'incidentType_Snowstorm', 
+                        'incidentType_Tropical Storm', 
+                        'incidentType_Severe Ice Storm', 
+                        'incidentType_Coastal Storm', 'incidentType_Hurricane', 'incidentType_Typhoon'], errors='ignore')
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
     disaster_types = list(coloum.replace('incidentType_', '') for coloum in y.columns)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    
 
     base_model = XGBClassifier(n_estimators=200, learning_rate=0.01, eval_metric='logloss')
     model = MultiOutputClassifier(base_model)

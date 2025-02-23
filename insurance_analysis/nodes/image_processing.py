@@ -5,8 +5,8 @@ import io
 
 
 # Cloudflare API credentials
-ACCOUNT_ID = "70ce45de58b391cf496b21b7f4d82be0"
-AUTH_TOKEN = "JWJ_5F6UAaMsD-sjF9blkYw2YHZmRjRFypilIBd5"
+ACCOUNT_ID = "074f2dec7dce93bbd2cda2fa339fd467"
+AUTH_TOKEN = "jyN1FIk7C9auWxDg40iFPqV3H0Is5giYRxrWmyIO"
 API_URL = (
     f"https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/ai/run/"
 )
@@ -15,6 +15,12 @@ API_URL = (
 
 def image_input(state: dict) -> dict:
     image_path = state["image"]
+    
+    image_bytes = state["image_bytes"]
+    
+    if image_bytes:
+        return {"image_data": image_path}
+    
     image = Image.open(image_path)
 
     bytes_io = io.BytesIO()
@@ -29,7 +35,7 @@ def object_detection(state: dict) -> dict:
     
     prompt = '''
         Identify the objects present in the image.
-        give the response in list of JSON format. Just a list of JSON objects. nothiing else.
+        give the response in list of JSON format. Just a list of JSON objects. nothing else.
         Provide a list of objects in the following JSON format:
         [
             {
@@ -47,7 +53,7 @@ def object_detection(state: dict) -> dict:
         headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
         json={
             "messages": [
-                {"role": "system", "content": "You are a object intifier. You have an image and you need to identify 10 main objects in the image. give the response in JSON format. Just a list of JSON objects. nothiing else."},
+                {"role": "system", "content": "You are a object intifier. You have an image and you need to identify 5 main objects in the image. give the response in JSON format. Just a list of JSON objects. nothiing else."},
                 {"role": "user", "content": prompt}
             ],
             "image": image_data,
@@ -85,7 +91,7 @@ def object_detection(state: dict) -> dict:
             {
                 "name": "name of item",
                 "description": "description about the item",
-                "quantity": quantity
+                "quantity": quantity (int)
             }
         ]
         give the response in list of JSON format. Just a list of JSON objects. nothiing else.
@@ -206,8 +212,7 @@ def loss_estimation(state: dict) -> dict:
             [
                 {
                     "name": "item name",
-                    "probability": probability (float),
-                    "reason": "reason for the probability"
+                    "probability": probability (float)
                 }
             ]
             

@@ -12,8 +12,8 @@ import io
 #     HTML(string=html_content).write_pdf(output_pdf)
 
 # Cloudflare API credentials
-ACCOUNT_ID = "70ce45de58b391cf496b21b7f4d82be0"
-AUTH_TOKEN = "JWJ_5F6UAaMsD-sjF9blkYw2YHZmRjRFypilIBd5"
+ACCOUNT_ID = "074f2dec7dce93bbd2cda2fa339fd467"
+AUTH_TOKEN = "jyN1FIk7C9auWxDg40iFPqV3H0Is5giYRxrWmyIO"
 API_URL = (
     f"https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/ai/run/"
 )
@@ -36,7 +36,7 @@ def disaster_loss_estimation(state: dict) -> dict:
             
             for data in price_data:
                 if data['name'] == item_name:
-                    item_cost = data['cost']
+                    item_cost = data['price']
                     break
             
             item_prob = item['probability']
@@ -48,37 +48,40 @@ def disaster_loss_estimation(state: dict) -> dict:
 
 def compare_insurance(state: dict) -> dict:
     estimated_damage = state["estimated_damage"]
-    policy_images = state["policy_images"]
+    policy_text = state["policy_text"]
     disaster_probability = state["disaster_probability"]
     objects = state["objects"]
+    price_data = state["price_data"]
     
     
-    model = "@cf/meta/llama-3.1-70b-instruct"
+    model = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
     
     system_prompt = '''
         You are an insurance policy evaluation system.
-        You have insurance policy images, information about common disaster in area , and list of items in the house.
+        You have insurance policy, information about common disaster in area , and list of items in the house.
         You need to check that insurance policy covers everything in the house and if the damages are covered or not.
         Provide a list of coverage and gap, green flages and red flags about the policy in the following JSON format:
         {
-            "coverage": [list of coverages],
-            "gap": [list of gaps],
-            "red flags": [list of red flags],
-            "green flags": [list of green flags]
+            "coverage": [list of coverages] (multiline points),
+            "gap": [list of gaps] (multiline points),
+            "red flags": [list of red flags] (small points) ,
+            "green flags": [list of green flags] (small points)
         }
     '''
     
     
     cost_of_object = 0
-    for object in objects:
-        cost_of_object += object['cost']
+    for object in price_data:
+        cost_of_object += object['price']
     
     
     prompt = f'''
     Information :
     Estimated Damage if disaster happens: {estimated_damage},
     Disaster Probability: {disaster_probability},
-    Cost of things in house: {cost_of_object}
+    Cost of things in house: {cost_of_object},
+    Cost of the House : 1200000,
+    insurance policy: {policy_text}
     '''
     
     response = requests.post(
@@ -89,7 +92,6 @@ def compare_insurance(state: dict) -> dict:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            "image": policy_images,
             "max_tokens": 10000,
             "response_format":{"type": "json"}
         }

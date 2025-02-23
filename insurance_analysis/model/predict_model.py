@@ -42,7 +42,7 @@ def predict_disaster_prob(fips, precip, max_temp, min_temp, avg_temp, month, yea
     fips = int(fips[5:])
     
 
-    input_data = np.array([[int(fips), float(precip), float(max_temp), float(min_temp), 
+    input_data = np.array([[int(fips), float(precip),
                             float(avg_temp), int(month), int(year), float(latitude), float(longitude)]],
                         dtype=np.float32)  # Force float32
 
