@@ -34,6 +34,11 @@ def train_disaster_model(data_path):
                            y['incidentType_Tropical Storm'] + 
                            y['incidentType_Severe Ice Storm'] + 
                            y['incidentType_Coastal Storm'])
+    
+    y['incidentType_Tornado'] = (y['incidentType_Tornado'] + 
+                           y['incidentType_Hurricane'] + 
+                           y['incidentType_Typhoon'])
+
 
     # Drop the original individual storm-related columns
     y = y.drop(columns=['incidentType_Severe Storm', 
@@ -41,7 +46,7 @@ def train_disaster_model(data_path):
                         'incidentType_Snowstorm', 
                         'incidentType_Tropical Storm', 
                         'incidentType_Severe Ice Storm', 
-                        'incidentType_Coastal Storm'], errors='ignore')
+                        'incidentType_Coastal Storm', 'incidentType_Hurricane', 'incidentType_Typhoon'], errors='ignore')
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 
@@ -86,9 +91,8 @@ def train_disaster_model(data_path):
 
         # Disaster types
         disaster_types = [
-            "Fire", "Flood", "Tornado", "Storm",
-            "Hurricane", "Other", "Biological","Mud/Landslide", "Earthquake", "Drought", "Toxic Substances", "Human Cause",
-            "Tsunami", "Freezing", "Typhoon"
+            "Fire", "Flood", "Tornado", "Storm", "Other", "Biological","Mud/Landslide", "Earthquake", "Drought", "Toxic Substances", "Human Cause",
+            "Tsunami", "Freezing"
         ]
 
         disaster_prob = {}
