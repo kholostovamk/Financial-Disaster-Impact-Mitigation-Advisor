@@ -7,3 +7,4 @@ pillow
 xgboost
 PyMuPDF
 scikit-learn
+folium
