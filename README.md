@@ -1,4 +1,4 @@
-# 🏠 HouseOnTheEdge – AI-Powered Insurance Risk Assessment  
+# 🏠 HomeOnTheEdge – AI-Powered Insurance Risk Assessment  
 
 ### **Bridging the gap between homeowners and insurance providers with AI-driven insights**  
 
@@ -6,7 +6,7 @@
 
 ## 🚀 Overview  
 
-HouseOnTheEdge is an **AI-driven risk assessment tool** that helps homeowners and insurance companies evaluate insurance coverage based on property risk and natural disaster probabilities.  
+HomeOnTheEdge is an **AI-driven risk assessment tool** that helps homeowners and insurance companies evaluate insurance coverage based on property risk and natural disaster probabilities.  
 
 This system leverages **natural language processing (NLP), computer vision, and machine learning** to analyze insurance policies, assess property conditions, and predict potential losses due to disasters like floods, earthquakes, and hurricanes.  
 
@@ -24,11 +24,11 @@ This system leverages **natural language processing (NLP), computer vision, and 
 
 ## 🏗️ Architecture  
 
-HouseOnTheEdge integrates multiple AI agents and machine learning models:  
+HomeOnTheEdge integrates multiple AI agents and machine learning models:  
 
 ### 🔹 **Pipeline Flow**  
 1. **User Uploads Data**  
-   - Insurance PDF & House Images  
+   - Insurance PDF & Home Images  
 2. **NLP Model Processes Policy Document**  
    - Extracts limits, deductibles, and exclusions  
 3. **Computer Vision Model Analyzes House Images**  
@@ -82,7 +82,7 @@ streamlit run app.py
 
 ## 📊 Dataset Sources  
 
-HouseOnTheEdge relies on publicly available datasets to train its risk prediction models:  
+HomeOnTheEdge relies on publicly available datasets to train its risk prediction models:  
 
 - **FEMA Disaster Summaries** – Historical disaster impact data  
 - **NOAA API** – Climate and weather data for disaster modeling  
