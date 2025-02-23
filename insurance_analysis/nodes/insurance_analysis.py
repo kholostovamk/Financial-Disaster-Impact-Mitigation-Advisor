@@ -23,18 +23,27 @@ def disaster_loss_estimation(state: dict) -> dict:
     loss_prob_wrt_disastor = state["loss_prob_wrt_disastor"]
     disaster_probability = state["disaster_probability"]
     objects = state["objects"]
+    price_data = state["price_data"]
     
     objects = [object['name'] for object in objects]
 
-    combined_loss = {
-        k: sum(
-            [
-                loss_prob_wrt_disastor[obj][k] * disaster_probability[obj]
-                for obj in loss_prob_wrt_disastor
-            ]
-        )
-        for k in objects
-    }
+    combined_loss = 0
+    
+    for disaster , item_prob in loss_prob_wrt_disastor.items():
+        dis_prob = disaster_probability[disaster]
+        for item in item_prob:
+            item_name = item['name']
+            
+            for data in price_data:
+                if data['name'] == item_name:
+                    item_cost = data['cost']
+                    break
+            
+            item_prob = item['probability']
+            
+            item_loss = item_cost * item_prob * dis_prob
+            combined_loss += item_loss
+    
     return {"estimated_damage": combined_loss}
 
 def compare_insurance(state: dict) -> dict:

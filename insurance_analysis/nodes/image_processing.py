@@ -29,7 +29,7 @@ def object_detection(state: dict) -> dict:
     
     prompt = '''
         Identify the objects present in the image.
-        give the response in JSON format. Just a list of JSON objects. nothiing else.
+        give the response in list of JSON format. Just a list of JSON objects. nothiing else.
         Provide a list of objects in the following JSON format:
         [
             {
@@ -70,8 +70,58 @@ def object_detection(state: dict) -> dict:
     json_data_end = response_text.rfind("]") + 1
     
     print(response_text[json_data_start:json_data_end])
+    
+    try:
 
-    objects = json.loads(response_text[json_data_start:json_data_end])
+        objects = json.loads(response_text[json_data_start:json_data_end])
+        
+    except json.JSONDecodeError:
+        
+        model = "@cf/meta/llama-3-8b-instruct-awq"
+        
+        system_prompt = '''
+        rewrite the given data into following format
+        [
+            {
+                "name": "name of item",
+                "description": "description about the item",
+                "quantity": quantity
+            }
+        ]
+        give the response in list of JSON format. Just a list of JSON objects. nothiing else.
+        '''
+        
+        response = requests.post(
+            API_URL + model,
+            headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+            json={
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": response_text}
+                ],
+                "max_tokens": 5000,
+                "response_format":{"type": "json"}
+            }   
+        )
+        
+        print(response.json())
+        
+        result = response.json()
+        response_text = result.get("result", {}).get("response", "")
+        
+        print(response_text)
+        
+        json_data_start = response_text.find("[")
+        json_data_end = response_text.rfind("]") + 1
+        
+        print(response_text[json_data_start:json_data_end])
+        
+        try:
+        
+            objects = json.loads(response_text[json_data_start:json_data_end])
+        except:
+            raise Exception("You are Fucked")
+        
     
     print(objects)
 
@@ -135,58 +185,65 @@ def loss_estimation(state: dict) -> dict:
         
     objects = state["objects"]
     
-    prompt = f'''
-    objects = {objects}
-    disaster_list = {disaster_list}
-    '''
+    loss_prob_wrt_each_disastor = {}
     
     
-    model = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+    for disaster in disaster_list:
     
-    system_prompt = '''
-        You are a intelligent damage predictor. You have a list of items in your store and you want to estimate the loss of each item in case of a disaster.
-        for each iteam report the loss in case in tems of range of 0 to 1, telling the probability of loss in case of a disaster.
-        Dont response python code , give the response in JSON format. Just a list of JSON objects. nothiing else.
-        Provide a list of prices in the following JSON format:
-        {
-            "disaster_type": [
+        prompt = f'''
+        objects = {objects}
+        disaster = {disaster}
+        '''
+    
+    
+        model = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+    
+        system_prompt = '''
+            You are a intelligent damage predictor. You have a list of items in your store and you want to estimate the loss of each item in case of a given disaster.
+            for each iteam report the loss in case in tems of range of 0 to 1, telling the probability of loss in case of a disaster.
+            Dont response python code , give the response in JSON format. Just a list of JSON objects. nothiing else.
+            Provide a list of prices in the following JSON format:
+            [
                 {
-                    "itemname": "item name",
+                    "name": "item name",
                     "probability": probability (float),
                     "reason": "reason for the probability"
                 }
             ]
-        }
-    '''
+            
+        '''
+            
+        response = requests.post(
+            API_URL + model,
+            headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+            json={
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": str(prompt)}
+                ],
+                "max_tokens": 6000,
+                "response_format":{"type": "json"}
+            }
+        )
     
-    response = requests.post(
-        API_URL + model,
-        headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
-        json={
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": str(prompt)}
-            ],
-            "max_tokens": 6000,
-            "response_format":{"type": "json"}
-        }
-    )
-    
-    result = response.json()
-    
-    print(result)
-    
-    response_text = result.get("result", {}).get("response", "")
-    
-    print(response_text)
-    json_data_start = response_text.find("{")
-    json_data_end = response_text.rfind("}") + 1
+        result = response.json()
+        
+        print(result)
+        
+        response_text = result.get("result", {}).get("response", "")
+        
+        print(response_text)
+        json_data_start = response_text.find("[")
+        json_data_end = response_text.rfind("]") + 1
 
-    loss_prob_wrt_disastor = json.loads(response_text[json_data_start:json_data_end])
-    
-    print(loss_prob_wrt_disastor)
-
+        loss_prob_wrt_disastor = json.loads(response_text[json_data_start:json_data_end])
+        
+        print(loss_prob_wrt_disastor)
+        
+        loss_prob_wrt_each_disastor[disaster] = loss_prob_wrt_disastor
+        
+    print(loss_prob_wrt_each_disastor)
     
     return {
-        "loss_prob_wrt_disastor": loss_prob_wrt_disastor
+        "loss_prob_wrt_disastor": loss_prob_wrt_each_disastor
     }
