@@ -3,7 +3,7 @@ from workflow import insurance_analysis_workflow
 # Example Inputs
 inputs = {
     "image": "spacejoy-vOa-PSimwg4-unsplash - Copy.jpg",
-    "pdf": "pdf.pdf",
+    "pdf": "Home_Insurance_Policy.pdf",
     "location": {"latitude": 37.7749, "longitude": -122.4194},
 }
 

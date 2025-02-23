@@ -29,6 +29,7 @@ def object_detection(state: dict) -> dict:
     
     prompt = '''
         Identify the objects present in the image.
+        give the response in JSON format. Just a list of JSON objects. nothiing else.
         Provide a list of objects in the following JSON format:
         [
             {
@@ -46,11 +47,11 @@ def object_detection(state: dict) -> dict:
         headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
         json={
             "messages": [
-                {"role": "system", "content": "You are a object intifier. You have an image and you need to identify the objects in the image."},
+                {"role": "system", "content": "You are a object intifier. You have an image and you need to identify 10 main objects in the image. give the response in JSON format. Just a list of JSON objects. nothiing else."},
                 {"role": "user", "content": prompt}
             ],
             "image": image_data,
-            "max_tokens": 2000,
+            "max_tokens": 5000,
             "response_format":{"type": "json"}
         }
     )
@@ -87,6 +88,7 @@ def price_estimation(state: dict) -> dict:
     system_prompt = '''
         You are a price estimator. You have a list of items in your store and their descreption
         and your task is to estimate the price of each item in dollars.
+        give the response in JSON format. Just a list of JSON objects. nothiing else.
         Provide a list of prices in the following list of JSON format:
         [
             {
@@ -144,6 +146,7 @@ def loss_estimation(state: dict) -> dict:
     system_prompt = '''
         You are a intelligent damage predictor. You have a list of items in your store and you want to estimate the loss of each item in case of a disaster.
         for each iteam report the loss in case in tems of range of 0 to 1, telling the probability of loss in case of a disaster.
+        Dont response python code , give the response in JSON format. Just a list of JSON objects. nothiing else.
         Provide a list of prices in the following JSON format:
         {
             "disaster_type": [

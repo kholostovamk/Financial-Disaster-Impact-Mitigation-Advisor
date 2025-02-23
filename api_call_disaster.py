@@ -161,11 +161,7 @@ def fetch_noaa_data(dataset_id, fips_code, year, month, datatype_ids, limit=5):
         print(f"❌ API Error: {response.status_code} - {response.text}")
         return None
 
-if __name__ == "__main__":
-    # HAS TO BE USER INPUT
-    latitude = 35.78
-    longitude = -78.64
-
+def get_other_parameters(latitude , longitude , fips_code):
     # Get Forecast Zone ID
     forecast_zone = get_forecast_zone(latitude, longitude)
 
@@ -185,20 +181,29 @@ if __name__ == "__main__":
     month = 1 #HAS TO BE INPUT OR DETECTED. MONTH HAS TO BE CURRENT MONTH - 1
     year = 2025 #HAS TO BE INPUT OR DETECTED
     dataset_id = "GSOM"
-    fips_code = "FIPS:37001" #HAS TO BE INPUT
+    fips_code = f"FIPS:{fips_code}" #HAS TO BE INPUT
     datatype_id = "PRCP"
     observations2 = fetch_noaa_data(dataset_id, fips_code, year, month, datatype_id, limit=1)
     precipitation = observations2["value"].iloc[0]*0.0393701
-    print(precipitation)  #INPUT VARIABLE TO MODEL. CONVERTED FROM mm -> inches
+    print(precipitation)  
 
 
 
-    #INPUTS TO MODEL
-    #1 temperature - FOUND
-    #2 precipitation - FOUND
-    #3 month - USE THE ONE DETECTED
-    #4 year - USE THE ONE DETECTED
-    #5 latitude - INPUT
-    #6 longitude - INPUT
-    #7 fips - INPUT / DETECTED
+    return fips_code , precipitation , temperature , temperature , temperature, month , 2025 , latitude , longitude
+
+
+
+if __name__ == "__main__":
+    latitude = 35.7796
+    longitude = -78.6382
+    
+    API_URL = "https://geo.fcc.gov/api/census/block/find"
+    
+    url = f'{API_URL}?latitude={latitude}&longitude={longitude}&format=json'
+    response = requests.get(url)
+    data = response.json()
+    fips =  data['County']['FIPS']
+    
+    print(get_other_parameters(latitude , longitude , fips))
+    
 

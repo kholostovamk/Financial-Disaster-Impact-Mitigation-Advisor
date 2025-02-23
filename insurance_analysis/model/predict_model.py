@@ -36,7 +36,23 @@ def predict_disaster_prob(fips, precip, max_temp, min_temp, avg_temp, month, yea
     Returns:
         dict: Predicted probabilities of disaster types.
     """
-    input_data = np.array([[fips, precip, max_temp, min_temp, avg_temp, month, year, latitude, longitude]])
+    
+    
+    
+    fips = int(fips[5:])
+    
+
+    input_data = np.array([[int(fips), float(precip), float(max_temp), float(min_temp), 
+                            float(avg_temp), int(month), int(year), float(latitude), float(longitude)]],
+                        dtype=np.float32)  # Force float32
+
+        
+    print("+="*50)
+    
+    print(input_data)
+    
+    
+    print("+="*50)
 
     # Get probabilities from model
     probs_list = model.predict_proba(input_data)

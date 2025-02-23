@@ -3,13 +3,13 @@ import requests
 from PIL import Image
 import io
 
-import markdown
-from weasyprint import HTML
+# import markdown
+# from weasyprint import HTML
 
-def markdown_to_pdf(markdown_string, output_pdf):
-    html_content = markdown.markdown(markdown_string)
+# def markdown_to_pdf(markdown_string, output_pdf):
+#     html_content = markdown.markdown(markdown_string)
 
-    HTML(string=html_content).write_pdf(output_pdf)
+#     HTML(string=html_content).write_pdf(output_pdf)
 
 # Cloudflare API credentials
 ACCOUNT_ID = "70ce45de58b391cf496b21b7f4d82be0"
@@ -142,8 +142,8 @@ def report_generation(state: dict) -> dict:
     
     print(response_text)
     
-    markdown_to_pdf(response_text, "report.pdf")
+    # markdown_to_pdf(response_text, "report.pdf")
     
-    return {"report": "report.pdf"}
+    return {"report": response_text}
 
     

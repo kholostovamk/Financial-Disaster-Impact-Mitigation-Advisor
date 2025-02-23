@@ -1,5 +1,6 @@
-# from pdf2image import convert_from_bytes
 import io
+import pypdfium2 as pdfium
+
 
 def pdf_input(state: dict) -> dict:
     pdf_path = state["pdf"]
@@ -7,15 +8,21 @@ def pdf_input(state: dict) -> dict:
         return {"pdf_data": f.read()}
 
 def pdf_parser(state: dict) -> dict:
-    # pdf_bytes = state["pdf_data"]
-    # images = convert_from_bytes(pdf_bytes, dpi=300)
+    # convert pdf to images
+    pdf_data = state["pdf_data"]
+    pdf_path = state["pdf"]
+    pdf = pdfium.PdfDocument(pdf_path)
     
-    # image_data_list = []
-    # for i, image in enumerate(images):
-    #     img_byte_arr = io.BytesIO()
-    #     image.save(img_byte_arr, format="PNG")
-    #     image_data_list.append(list(img_byte_arr.getvalue()))  
-
-    return {"policy_images": "Test"}
+    images = []
+    for i in range(len(pdf)):
+        page = pdf[i]
+        image = page.render().to_pil()
+        
+        # Convert PIL image to bytes
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format='PNG')  # You can use JPEG or other formats
+        images.append(img_byte_arr.getvalue())
+    
+    return {"policy_images": images}
     
     
