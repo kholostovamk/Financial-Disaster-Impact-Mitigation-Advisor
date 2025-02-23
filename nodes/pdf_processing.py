@@ -1,7 +1,5 @@
 import io
-import pypdfium2 as pdfium
 import fitz
-from io import BytesIO
 
 
 
