@@ -15,7 +15,5 @@ class State(TypedDict):
     policy_images: str
     disaster_probability: dict
     estimated_damage: dict
-    coverage: dict
-    gap: float
+    evaluation : dict
     report: str
-    suggestions: list

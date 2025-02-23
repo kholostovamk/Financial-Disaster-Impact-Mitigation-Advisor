@@ -1,5 +1,6 @@
 import requests
 from config import API_URL
+from model.predict_model import predict_disaster_prob
 
 def location_input(state: dict) -> dict:
     try:
@@ -12,4 +13,9 @@ def location_input(state: dict) -> dict:
         return {"fips": 12345}
 
 def disaster_probability_model(state: dict) -> dict:
-    return {"disaster_probability": {"earthquake": 0.2, "tornado": 0.3, "floods": 0.5, "fires": 0.7}}
+    latitude, longitude = state["location"]["latitude"], state["location"]["longitude"]
+    fips = state["fips"]
+    disaster_probability = predict_disaster_prob(fips, 1.19, 69.4, 44.3, 56.8, 5, 2023, latitude, longitude)
+    
+    
+    return {"disaster_probability": disaster_probability}

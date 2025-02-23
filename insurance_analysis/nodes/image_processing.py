@@ -1,15 +1,8 @@
 import json
-import cv2
 import requests
-import torch
-import numpy as np
-import matplotlib.pyplot as plt
-from ultralytics import YOLO
-import os
 from PIL import Image
 import io
 
-from config import disaster_types
 
 # Cloudflare API credentials
 ACCOUNT_ID = "70ce45de58b391cf496b21b7f4d82be0"
@@ -53,7 +46,7 @@ def object_detection(state: dict) -> dict:
         headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
         json={
             "messages": [
-                {"role": "system", "content": "You are a friendly assistant"},
+                {"role": "system", "content": "You are a object intifier. You have an image and you need to identify the objects in the image."},
                 {"role": "user", "content": prompt}
             ],
             "image": image_data,
@@ -135,10 +128,10 @@ def price_estimation(state: dict) -> dict:
     return {"price_data": price_data}
 
 def loss_estimation(state: dict) -> dict:
-    
-    disaster_list = disaster_types
+    with open("disaster_types.json", "r") as f:
+        disaster_list = json.load(f)
+        
     objects = state["objects"]
-    
     
     prompt = f'''
     objects = {objects}
@@ -146,7 +139,7 @@ def loss_estimation(state: dict) -> dict:
     '''
     
     
-    model = "@cf/meta/llama-3-8b-instruct-awq"
+    model = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
     
     system_prompt = '''
         You are a intelligent damage predictor. You have a list of items in your store and you want to estimate the loss of each item in case of a disaster.
@@ -171,7 +164,7 @@ def loss_estimation(state: dict) -> dict:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": str(prompt)}
             ],
-            "max_tokens": 5000,
+            "max_tokens": 6000,
             "response_format":{"type": "json"}
         }
     )
@@ -189,10 +182,7 @@ def loss_estimation(state: dict) -> dict:
     loss_prob_wrt_disastor = json.loads(response_text[json_data_start:json_data_end])
     
     print(loss_prob_wrt_disastor)
-    
-    
-    
-    
+
     
     return {
         "loss_prob_wrt_disastor": loss_prob_wrt_disastor
